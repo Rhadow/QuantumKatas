@@ -47,7 +47,7 @@ namespace Quantum.Kata.BasicGates {
             // The Pauli X gate will change the |0⟩ state to the |1⟩ state and vice versa.
             // Type X(q);
             // Then rebuild the project and rerun the tests - T11_StateFlip_Test should now pass!
-            
+            X(q);
             // ...
         }
         
@@ -67,6 +67,7 @@ namespace Quantum.Kata.BasicGates {
         
         body (...) {
             // ...
+            H(q);
         }
         
         adjoint self;
@@ -80,6 +81,7 @@ namespace Quantum.Kata.BasicGates {
         
         body (...) {
             // ...
+            Z(q);
         }
         
         adjoint self;
@@ -97,6 +99,7 @@ namespace Quantum.Kata.BasicGates {
     operation AmplitudeChange (q : Qubit, alpha : Double) : Unit
     is Adj {        
         // ...
+        R(PauliY, alpha * 2.0, q);
     }
     
     
@@ -106,6 +109,7 @@ namespace Quantum.Kata.BasicGates {
     operation PhaseFlip (q : Qubit) : Unit 
     is Adj {
         // ...
+        S(q);
     }
     
     
@@ -120,6 +124,7 @@ namespace Quantum.Kata.BasicGates {
     operation PhaseChange (q : Qubit, alpha : Double) : Unit
     is Adj {
         // ...
+        R1(alpha, q);
     }
     
     
@@ -129,6 +134,7 @@ namespace Quantum.Kata.BasicGates {
     operation BellStateChange1 (qs : Qubit[]) : Unit
     is Adj {
         // ...
+        Z(qs[0]);
     }
     
     
@@ -138,6 +144,7 @@ namespace Quantum.Kata.BasicGates {
     operation BellStateChange2 (qs : Qubit[]) : Unit
     is Adj {
         // ...
+        X(qs[0]);
     }
     
     
@@ -147,6 +154,8 @@ namespace Quantum.Kata.BasicGates {
     operation BellStateChange3 (qs : Qubit[]) : Unit
     is Adj {        
         // ...
+        X(qs[0]);
+        Z(qs[0]);
     }
     
     
@@ -166,6 +175,7 @@ namespace Quantum.Kata.BasicGates {
         
         body (...) {
             // ...
+            CNOT(qs[0], qs[1]);
         }
         
         adjoint self;
@@ -182,6 +192,7 @@ namespace Quantum.Kata.BasicGates {
         
         body (...) {
             // ...
+            CZ(qs[0], qs[1]);
         }
         
         adjoint self;
@@ -200,6 +211,11 @@ namespace Quantum.Kata.BasicGates {
             // (possibly controlled) Pauli gates.
             
             // ...
+
+            // SWAP(qs[0], qs[1]);
+            CNOT(qs[1], qs[0]);
+            CNOT(qs[0], qs[1]);
+            CNOT(qs[1], qs[0]);
         }
         
         adjoint self;
@@ -216,6 +232,7 @@ namespace Quantum.Kata.BasicGates {
         
         body (...) {
             // ...
+            CCNOT(qs[0], qs[1], qs[2]);
         }
         
         adjoint self;
@@ -226,11 +243,18 @@ namespace Quantum.Kata.BasicGates {
     // Input: Three qubits (stored in an array of length 3) in an arbitrary three-qubit state
     //        α|000⟩ + β|001⟩ + γ|010⟩ + δ|011⟩ + ε|100⟩ + ζ|101⟩ + η|110⟩ + θ|111⟩.
     // Goal:  Swap the states of second and third qubit if and only if the state of the first qubit is |1⟩:
-    //        α|000⟩ + β|001⟩ + γ|010⟩ + δ|011⟩ + ε|100⟩ + η|101⟩ + ζ|110⟩ + θ|111⟩.
+    //        α|000⟩ + β|001⟩ + γ|010⟩ + δ|011⟩ + ε|100⟩ + ζ|110⟩ + η|101⟩ + θ|111⟩.
     operation FredkinGate (qs : Qubit[]) : Unit {
         
         body (...) {
             // ...
+            // CCNOT(qs[0], qs[1], qs[2]);
+            // CCNOT(qs[0], qs[2], qs[1]);
+            // CCNOT(qs[0], qs[1], qs[2]);
+
+            CNOT(qs[1], qs[2]);
+            CCNOT(qs[0], qs[2], qs[1]);
+            CNOT(qs[1], qs[2]);
         }
         
         adjoint self;
