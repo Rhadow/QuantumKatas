@@ -296,8 +296,8 @@ namespace Quantum.Kata.Superposition {
     //          the state you need to prepare is (|010⟩ + |100⟩ + |001⟩ + |110⟩) / 2.
     operation FourBitstringSuperposition (qs : Qubit[], bits : Bool[][]) : Unit {
         // Hint: remember that you can allocate extra qubits.
-        
         // ...
+        // Need to understand how ancilla bits work in q sharp
     }
     
     
@@ -384,5 +384,19 @@ namespace Quantum.Kata.Superposition {
     // Example: for N = 3, W state is (|100⟩ + |010⟩ + |001⟩) / sqrt(3).
     operation WState_Arbitrary (qs : Qubit[]) : Unit {
         // ...
+        // Similar to ThreeStates_TwoQubits question, start by thinking on how to get the correct amplitude.
+        // The answer is to rotate each qubit with angle coreesponding to its index
+
+        let N = Length(qs);
+        mutable index = N - 1;
+        repeat {
+            mutable angle = ArcSin(1.0 / Sqrt(IntAsDouble(index + 1))) * 2.0;
+            if (index == N - 1) {
+                Ry(angle, qs[index]);
+            } else {
+                (ControlledOnInt(0, Ry))(qs[index+1..N-1], (angle, qs[index]));
+            }
+            set index -= 1;
+        } until (index < 0);
     }
 }

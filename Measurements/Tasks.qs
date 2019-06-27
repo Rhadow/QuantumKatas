@@ -7,6 +7,7 @@ namespace Quantum.Kata.Measurements {
     open Microsoft.Quantum.Canon;
     open Microsoft.Quantum.Convert;
     open Microsoft.Quantum.Math;
+    open Microsoft.Quantum.Diagnostics;
     
     
     //////////////////////////////////////////////////////////////////
@@ -43,7 +44,7 @@ namespace Quantum.Kata.Measurements {
         // Replace the returned expression with (M(q) == One).
         // Then rebuild the project and rerun the tests - T101_IsQubitOne_Test should now pass!
 
-        return false;
+        return M(q) == One;
     }
     
     
@@ -52,6 +53,9 @@ namespace Quantum.Kata.Measurements {
     // Goal:  change the state of the qubit to |0⟩.
     operation InitializeQubit (q : Qubit) : Unit {
         // ...
+        if (M(q) == One) {
+            X(q);
+        }
     }
     
     
@@ -62,7 +66,8 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubit at the end of the operation does not matter.
     operation IsQubitPlus (q : Qubit) : Bool {
         // ...
-        return false;
+        H(q);
+        return M(q) == Zero;
     }
     
     
@@ -76,7 +81,8 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubit at the end of the operation does not matter.
     operation IsQubitA (alpha : Double, q : Qubit) : Bool {
         // ...
-        return false;
+        Ry(-alpha * 2.0, q);
+        return M(q) == Zero;
     }
     
     
@@ -87,7 +93,7 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation ZeroZeroOrOneOne (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        return M(qs[0]) == Zero ? 0 | 1;
     }
     
     
@@ -104,7 +110,11 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation BasisStateMeasurement (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        if (M(qs[0]) == Zero) {
+            return M(qs[1]) == Zero ? 0 | 1;
+        } else {
+            return M(qs[1]) == Zero ? 2 | 3;
+        }
     }
     
     
@@ -124,7 +134,16 @@ namespace Quantum.Kata.Measurements {
     //          return 0 corresponds to state |010⟩, and return 1 corresponds to state |001⟩.
     operation TwoBitstringsMeasurement (qs : Qubit[], bits1 : Bool[], bits2 : Bool[]) : Int {
         // ...
-        return -1;
+        mutable diffIndex = -1;
+        mutable target = One;
+        let N = Length(qs);
+        for (i in 0..N-1) {
+            if (bits1[i] != bits2[i]) {
+                set diffIndex = i;
+                set target = bits1[i] ? One | Zero;
+            }
+        }
+        return M(qs[diffIndex]) == target ? 0 | 1;
     }
     
     
@@ -137,7 +156,14 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation AllZerosOrWState (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        mutable result = 0;
+        let N = Length(qs);
+        for (i in 0..N-1) {
+            if (M(qs[i]) == One) {
+                set result = 1;
+            }
+        }
+        return result;
     }
     
     
@@ -150,7 +176,18 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation GHZOrWState (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        mutable result = 0;
+        let N = Length(qs);
+        for (i in 1..N-1) {
+            CNOT(qs[0], qs[i]);
+        }
+        H(qs[0]);
+        for (i in 0..N-1) {
+            if (M(qs[i]) == One) {
+                set result = 1;
+            }
+        }
+        return result;
     }
     
     
@@ -169,7 +206,13 @@ namespace Quantum.Kata.Measurements {
         // Hint: you need to use 2-qubit gates to solve this task
         
         // ...
-        return -1;
+        CNOT(qs[0], qs[1]);
+        H(qs[0]);
+        if (M(qs[0]) == Zero) {
+            return M(qs[1]) == Zero ? 0 | 2;
+        } else {
+            return M(qs[1]) == Zero ? 1 | 3;
+        }
     }
     
     
@@ -186,7 +229,12 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation TwoQubitState (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        ApplyToEachA(H, qs);
+        if (M(qs[0]) == Zero) {
+            return M(qs[1]) == Zero ? 0 | 1;
+        } else {
+            return M(qs[1]) == Zero ? 2 | 3;
+        }
     }
     
     

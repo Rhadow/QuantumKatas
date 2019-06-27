@@ -139,7 +139,7 @@ namespace Quantum.Kata.Measurements {
                                             statePrep : ((Qubit[], Int) => Unit), 
                                             testImpl : (Qubit[] => Int), 
                                             measurementsPerRun : Int) : Unit {
-        let nTotal = 100;
+        let nTotal = 4;
         mutable nOk = 0;
         
         using (qs = Qubit[Nqubit]) {
