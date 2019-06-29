@@ -1,2 +1,6 @@
-Chapter 2 Superposition:
+﻿Chapter 2 Superposition:
 Task 13 - FourBitstringSuperposition
+
+Chapter 3 Measurements:
+Task 1.13 - Distinguish two orthogonal states on three qubits
+Task 2.3 - Unambiguous state discrimination of 3 non-orthogonal states on one qubit

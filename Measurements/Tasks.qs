@@ -251,7 +251,14 @@ namespace Quantum.Kata.Measurements {
     // The state of the qubits at the end of the operation does not matter.
     operation TwoQubitStatePartTwo (qs : Qubit[]) : Int {
         // ...
-        return -1;
+        H(qs[0]);
+        CNOT(qs[0], qs[1]);
+        H(qs[0]);
+        if (M(qs[0]) == Zero) {
+            return M(qs[1]) == Zero ? 3 | 2;
+        } else {
+            return M(qs[1]) == Zero ? 1 | 0;
+        }
     }
     
     
@@ -288,7 +295,8 @@ namespace Quantum.Kata.Measurements {
     // Note: in this task you have to get accuracy of at least 80%.
     operation IsQubitPlusOrZero (q : Qubit) : Bool {
         // ...
-        return true;
+        Ry(PI()/4.0, q);
+        return M(q) == Zero;
     }
     
     
@@ -308,7 +316,23 @@ namespace Quantum.Kata.Measurements {
     // You are allowed to use ancilla qubit(s).
     operation IsQubitPlusZeroOrInconclusiveSimpleUSD (q : Qubit) : Int {
         // ...
-        return -2;
+        mutable result = -1;
+        DumpRegister("", [q]);
+        using(anc1 = Qubit()) {
+            H(anc1);
+            if (M(anc1) == Zero) {
+                if (M(q) == One) {
+                    set result = 1;
+                }
+            } else{
+                H(q);
+                if (M(q) == One) {
+                    set result = 0;
+                }
+            }
+            Reset(anc1);
+        }
+        return result;
     }
 
     
