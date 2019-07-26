@@ -49,11 +49,25 @@ namespace Quantum.Kata.GroversAlgorithm {
     //       If the query register is in state (|00...0⟩ + |11...1⟩) / sqrt(2), and the target is in state |0⟩,
     //       the joint state of the query register and the target qubit should be (|00...00⟩ + |11...11⟩) / sqrt(2).
     operation Oracle_AllOnes (queryRegister : Qubit[], target : Qubit) : Unit {
-        
         body (...) {
-            // ...
+            // We can use a set of ancilla bits to store the state for each query register with CCNOT gate.
+            // Then we can use the last bit in ancilla bits set to reverse target
+            let N = Length(queryRegister);
+            using (anc = Qubit[N]) {
+                X(anc[0]);
+                for (i in 0..N-2) {
+                    CCNOT(anc[i], queryRegister[i], anc[i + 1]);
+                }
+                CCNOT(anc[N-1], queryRegister[N-1], target);
+                // Restore ancillas
+                mutable index = N - 2;
+                while (index >= 0) {
+                    CCNOT(anc[index], queryRegister[index], anc[index + 1]);
+                    set index -= 1;
+                }
+                X(anc[0]);
+            }
         }
-        
         adjoint self;
     }
     
@@ -70,11 +84,42 @@ namespace Quantum.Kata.GroversAlgorithm {
     //        If the register is in state |0000000⟩, leave the target qubit unchanged.
     //        If the register is in state |10101⟩, flip the target qubit.
     operation Oracle_AlternatingBits (queryRegister : Qubit[], target : Qubit) : Unit {
-        
         body (...) {
-            // ...
+            // Same principle as last kata, need to reverse the bit when index is odd since the bit is 0 and we need a 1 for CCNOT to work properly.
+            let N = Length(queryRegister);
+            using (anc = Qubit[N]) {
+                X(anc[0]);
+                for (i in 0..N-2) {
+                    if (i % 2 == 1) {
+                        X(queryRegister[i]);
+                    }
+                    CCNOT(anc[i], queryRegister[i], anc[i + 1]);
+                    if (i % 2 == 1) {
+                        X(queryRegister[i]);
+                    }
+                }
+                if ((N-1) % 2 == 1) {
+                    X(queryRegister[N-1]);
+                }
+                CCNOT(anc[N-1], queryRegister[N-1], target);
+                // Reverse the ancillas
+                if ((N-1) % 2 == 1) {
+                    X(queryRegister[N-1]);
+                }
+                mutable index = N - 2;
+                while (index >= 0) {
+                    if (index % 2 == 1) {
+                        X(queryRegister[index]);
+                    }
+                    CCNOT(anc[index], queryRegister[index], anc[index + 1]);
+                    if (index % 2 == 1) {
+                        X(queryRegister[index]);
+                    }
+                    set index -= 1;
+                }
+                X(anc[0]);
+            }
         }
-        
         adjoint self;
     }
     
@@ -91,15 +136,30 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Example:
     //        If the bit pattern is [true, false], you need to flip the target qubit if and only if the qubits are in the |10⟩ state.
     operation Oracle_ArbitraryPattern (queryRegister : Qubit[], target : Qubit, pattern : Bool[]) : Unit {
-        
+
         body (...) {
             // The following line enforces the constraint on the input arrays.
             // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
             EqualityFactI(Length(queryRegister), Length(pattern), "Arrays should have the same length");
 
-            // ...
+            // Here we modify the queryRegister according to pattern by fliping the qubit if the register is false.
+            // If the qubits match the patterm, it should be in all |0...0> state.
+            // We can use the queryRegister to decide whether to invert the target or not.
+            let N = Length(queryRegister);
+            for (i in 0..N-1) {
+                if (pattern[i]) {
+                    X(queryRegister[i]);
+                }
+            }
+            (ControlledOnInt(0, X))(queryRegister, target);
+            // Reverse the action we took on queryRegister qubits
+            for (i in 0..N-1) {
+                if (pattern[i]) {
+                    X(queryRegister[i]);
+                }
+            }
         }
-        
+
         adjoint self;
     }
     
@@ -114,15 +174,22 @@ namespace Quantum.Kata.GroversAlgorithm {
     // but it is often easier to write a marking oracle for a given condition. This transformation
     // allows to convert one type of oracle into the other. The transformation is described at
     // https://en.wikipedia.org/wiki/Grover%27s_algorithm, section "Description of Uω".
+
+    operation ConverterImplementation (markingOracle : ((Qubit[], Qubit) => Unit is Adj), register: Qubit[]) : Unit is Adj {
+        using (anc = Qubit()) {
+            X(anc);
+            H(anc);
+            markingOracle(register, anc);
+            H(anc);
+            X(anc);
+        }
+    }
+
     function OracleConverter (markingOracle : ((Qubit[], Qubit) => Unit is Adj)) : (Qubit[] => Unit is Adj) {
-        
         // Hint: Remember that you can define auxiliary operations.
-        
-        // ...
-        
         // Currently this function returns a no-op operation for the sake of being able to compile the code.
         // You will need to remove ApplyToEachA and return your own oracle instead.
-        return ApplyToEachA(I, _);
+        return ConverterImplementation(markingOracle, _);
     }
     
     
@@ -138,7 +205,9 @@ namespace Quantum.Kata.GroversAlgorithm {
     //        will prepare an equal superposition of all 2^N basis states.
     operation HadamardTransform (register : Qubit[]) : Unit
     is Adj {
-        // ...
+        for (i in 0..Length(register)-1) {
+            H(register[i]);
+        }
     }
     
     
@@ -157,8 +226,16 @@ namespace Quantum.Kata.GroversAlgorithm {
         // as the state obtained by flipping the sign of only the |0...0⟩ state.
             
         // Hint 2: You can use the same trick as in the oracle converter task.
-            
-        // ...
+        let N = Length(register);
+        for (i in 0..N-1) {
+            X(register[i]);
+            if (i == N-1) {
+                (ControlledOnInt((2 ^ (N-1)) - 1, Z))(register[0..N-2], register[i]);
+            }
+        }
+        for (i in 0..N-1) {
+            X(register[i]);
+        }
     }
     
     
@@ -176,8 +253,11 @@ namespace Quantum.Kata.GroversAlgorithm {
         //    2) apply the Hadamard transform
         //    3) perform a conditional phase shift
         //    4) apply the Hadamard transform again
-            
-        // ...
+
+        oracle(register);
+        HadamardTransform(register);
+        ConditionalPhaseFlip(register);
+        HadamardTransform(register);
     }
     
     
@@ -196,7 +276,10 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Note: The number of iterations is passed as a parameter because it is defined by the nature of the problem
     // and is easier to configure/calculate outside the search algorithm itself (for example, in the driver).
     operation GroversSearch (register : Qubit[], oracle : ((Qubit[], Qubit) => Unit is Adj), iterations : Int) : Unit {
-        // ...
+        HadamardTransform(register);
+        for (i in 0..iterations-1) {
+            GroverIteration(register, OracleConverter(oracle));
+        }
     }
     
     
@@ -215,7 +298,25 @@ namespace Quantum.Kata.GroversAlgorithm {
 
         // Hint 3: You can use the Message function to write the results to the console.
 
-        // ...
+        let N = 8;
+        let pattern = [true, false, true, true, false, false, true, false];
+        let testRun = 10;
+
+        for (j in 0..testRun) {
+            mutable s = "";
+            using (anc = Qubit[N]) {
+                GroversSearch(anc, Oracle_ArbitraryPattern(_, _, pattern), 11);
+                for (i in 0..N-1) {
+                    if (M(anc[i]) == One) {
+                        set s += "1";
+                    } else {
+                        set s += "0";
+                    }
+                }
+                Message(s);
+                ResetAll(anc);
+            }
+        }
     }
     
 }

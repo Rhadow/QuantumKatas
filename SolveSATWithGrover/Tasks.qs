@@ -8,6 +8,8 @@ namespace Quantum.Kata.GroversAlgorithm {
     open Microsoft.Quantum.Diagnostics;
     open Microsoft.Quantum.Convert;
     open Microsoft.Quantum.Math;
+    open Microsoft.Quantum.Arrays;
+    open Microsoft.Quantum.Measurement;
     
     
     //////////////////////////////////////////////////////////////////
@@ -49,8 +51,8 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_And (queryRegister : Qubit[], target : Qubit) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        CCNOT(queryRegister[0], queryRegister[1], target);
     }
 
 
@@ -65,8 +67,10 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_Or (queryRegister : Qubit[], target : Qubit) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        CNOT(queryRegister[0], target);
+        CNOT(queryRegister[1], target);
+        CCNOT(queryRegister[0], queryRegister[1], target);
     }
 
 
@@ -81,8 +85,9 @@ namespace Quantum.Kata.GroversAlgorithm {
     // Stretch goal: Can you implement the oracle so that it would work
     //               for queryRegister containing an arbitrary number of qubits?
     operation Oracle_Xor (queryRegister : Qubit[], target : Qubit) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        CNOT(queryRegister[0], target);
+        CNOT(queryRegister[1], target);
     }
 
 
@@ -98,8 +103,22 @@ namespace Quantum.Kata.GroversAlgorithm {
     // It is possible (and quite straightforward) to implement this oracle based on this observation; 
     // however, for the purposes of learning to write oracles to solve SAT problems we recommend using the representation above.
     operation Oracle_AlternatingBits (queryRegister : Qubit[], target : Qubit) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        let N = Length(queryRegister);
+        using (anc = Qubit[N-1]) {
+            // XOR each set
+            for (i in 0..N-2) {
+                Oracle_Xor([queryRegister[i], queryRegister[i + 1]], anc[i]);
+                X(anc[i]);
+            }
+            // Invert the target only when anc is |1...1>
+            (ControlledOnInt(0, X))(anc, target);
+            // Reversing the action we took on ancillas
+            for (i in 0..N-2) {
+                X(anc[i]);
+                Oracle_Xor([queryRegister[i], queryRegister[i + 1]], anc[i]);
+            }
+        }
     }
 
 
@@ -135,8 +154,48 @@ namespace Quantum.Kata.GroversAlgorithm {
     operation Oracle_2SAT (queryRegister : Qubit[], 
                            target : Qubit, 
                            problem : (Int, Bool)[][]) : Unit
-        is Adj {        
-            // ...
+        is Adj {
+            let N = Length(problem);
+            using (anc = Qubit[N]) {
+                // Or each set and save the result in ancilla sets
+                for (i in 0..N-1) {
+                    let (index1, isInvert1) = problem[i][0];
+                    let (index2, isInvert2) = problem[i][1];
+                    if (isInvert1 == false) {
+                        X(queryRegister[index1]);
+                    }
+                    if (isInvert2 == false) {
+                        X(queryRegister[index2]);
+                    }
+                    Oracle_Or([queryRegister[index1], queryRegister[index2]], anc[i]);
+                    if (isInvert1 == false) {
+                        X(queryRegister[index1]);
+                    }
+                    if (isInvert2 == false) {
+                        X(queryRegister[index2]);
+                    }
+                }
+                // Invert the target only when anc is |1...1>
+                Controlled X(anc, target);
+                // Reversing the action we took on ancillas
+                for (i in 0..N-1) {
+                    let (index1, isInvert1) = problem[i][0];
+                    let (index2, isInvert2) = problem[i][1];
+                    if (isInvert1 == false) {
+                        X(queryRegister[index1]);
+                    }
+                    if (isInvert2 == false) {
+                        X(queryRegister[index2]);
+                    }
+                    Oracle_Or([queryRegister[index1], queryRegister[index2]], anc[i]);
+                    if (isInvert1 == false) {
+                        X(queryRegister[index1]);
+                    }
+                    if (isInvert2 == false) {
+                        X(queryRegister[index2]);
+                    }
+                }
+            }
     }
 
 
@@ -166,7 +225,70 @@ namespace Quantum.Kata.GroversAlgorithm {
                           target : Qubit, 
                           problem : (Int, Bool)[][]) : Unit
         is Adj {        
-        // ...
+            let N = Length(problem);
+            using (anc = Qubit[N]) {
+                // Or each set and save the result in ancilla sets
+                for (i in 0..N-1) {
+                    let L = Length(problem[i]);
+                    using (anc1 = Qubit[L]) {
+                        for (j in 0..L-1) {
+                            let (index, isInvert) = problem[i][j];
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                            CNOT(queryRegister[index], anc1[j]);
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                        }
+                        // Set anc[i] to 1 when any of the bit in anc1 is 1
+                        (ControlledOnInt(0, X))(anc1, anc[i]);
+                        X(anc[i]);
+                        // Reverse actions we took on anc1
+                        for (j in 0..L-1) {
+                            let (index, isInvert) = problem[i][j];
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                            CNOT(queryRegister[index], anc1[j]);
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                        }
+                    }
+                }
+                // Invert the target only when anc is |1...1>
+                Controlled X(anc, target);
+                // Reversing the action we took on ancillas
+                for (i in 0..N-1) {
+                    let L = Length(problem[i]);
+                    using (anc1 = Qubit[L]) {
+                        for (j in 0..L-1) {
+                            let (index, isInvert) = problem[i][j];
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                            CNOT(queryRegister[index], anc1[j]);
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                        }
+                        X(anc[i]);
+                        (ControlledOnInt(0, X))(anc1, anc[i]);
+                        // Reverse actions we took on anc1
+                        for (j in 0..L-1) {
+                            let (index, isInvert) = problem[i][j];
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                            CNOT(queryRegister[index], anc1[j]);
+                            if (isInvert == false) {
+                                X(queryRegister[index]);
+                            }
+                        }
+                    }
+                }
+            }
     }
 
 
@@ -205,7 +327,26 @@ namespace Quantum.Kata.GroversAlgorithm {
     // (the number that minimizes the probability of such failure). 
     // In this task you also need to make your implementation robust to not knowing the optimal number of iterations.
     operation GroversAlgorithm (N : Int, oracle : ((Qubit[], Qubit) => Unit is Adj)) : Bool[] {
-        // ...
-        return new Bool[N];
+        mutable result = new Bool[N];
+        // using ((target, anc) = (Qubit[N], Qubit())) {
+        //     ApplyToEach(H, target);
+        //     for (i in 0..64) {
+        //         // Phase shift for target x
+        //         X(anc);
+        //         H(anc);
+        //         oracle(target, anc);
+        //         H(anc);
+        //         X(anc);
+        //         ApplyToEach(H, target);
+        //         ApplyToEach(X, target);
+        //         Controlled Z(Most(target), Tail(target));
+        //         ApplyToEach(X, target);
+        //         ApplyToEach(H, target);
+        //     }
+        //     let res = MultiM(target);
+        //     set result = BoolArrFromResultArr(res);
+        //     ResetAll(target);
+        // }
+        return result;
     }
 }

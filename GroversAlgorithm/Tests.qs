@@ -14,6 +14,7 @@ namespace Quantum.Kata.GroversAlgorithm {
     open Microsoft.Quantum.Diagnostics;
     open Microsoft.Quantum.Convert;
     open Microsoft.Quantum.Math;
+    open Microsoft.Quantum.Intrinsic;
     
     
     // ------------------------------------------------------
@@ -106,6 +107,11 @@ namespace Quantum.Kata.GroversAlgorithm {
             let refOp = GroversSearch_Reference(_, markingOracle, 4);
             AssertOperationsEqualReferenced(n, testOp, refOp);
         }
+    }
+
+    // ------------------------------------------------------
+    operation T32_E2E_GroversSearch_Test () : Unit {
+        E2E_GroversSearch_Test();
     }
     
 }

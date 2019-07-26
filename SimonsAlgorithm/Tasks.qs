@@ -32,10 +32,11 @@ namespace Quantum.Kata.SimonsAlgorithm {
     // Goal: Transform state |x, y⟩ into |x, y ⊕ x_0 ⊕ x_1 ... ⊕ x_{n-1}⟩ (⊕ is addition modulo 2).
     operation Oracle_CountBits (x : Qubit[], y : Qubit) : Unit
     is Adj {        
-        // ...
+        for (i in 0..Length(x)-1) {
+            CNOT(x[i], y);
+        }
     }
-    
-    
+
     // Task 1.2. Bitwise right shift
     // Inputs:
     //      1) N qubits in an arbitrary state |x⟩
@@ -43,8 +44,10 @@ namespace Quantum.Kata.SimonsAlgorithm {
     // Goal: Transform state |x, y⟩ into |x, y ⊕ f(x)⟩, where f is bitwise right shift function, i.e.,
     // |y ⊕ f(x)⟩ = |y_0, y_1 ⊕ x_0, y_2 ⊕ x_1, ..., y_{n-1} ⊕ x_{n-2}⟩ (⊕ is addition modulo 2).
     operation Oracle_BitwiseRightShift (x : Qubit[], y : Qubit[]) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        for (i in 1..Length(x)-1) {
+            CNOT(x[i - 1], y[i]);
+        }
     }
     
     
@@ -61,8 +64,18 @@ namespace Quantum.Kata.SimonsAlgorithm {
         // The following line enforces the constraint on the input arrays.
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(A), "Arrays x and A should have the same length");
-            
-        // ...
+
+        // The transformation is matrix multiplication. A (1xN) dot x (Nx1) will result a 1x1 value.
+        // If this value is odd we flip y else not. The calculcation can also be broken down to each bit:
+        // A = [1,2,3], X = [0,1,1] the result will be 1x0+2*1+3*1 = 5, we flip y. Notice that only when
+        // X[i] is 1, A will contribute to the result, also whether the value of A is odd will also affect
+        // the result. The final logic becomes for each bit, if X[i] is 1 and A[i] is odd, flip y.
+        let N = Length(x);
+        for (i in 0..N-1) {
+            if (A[i] % 2 == 1) {
+                CNOT(x[i], y);
+            }
+        }
     }
     
     
@@ -83,8 +96,13 @@ namespace Quantum.Kata.SimonsAlgorithm {
         // You don't need to modify them. Feel free to remove them, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(A[0]), "Arrays x and A[0] should have the same length");
         EqualityFactI(Length(y), Length(A), "Arrays y and A should have the same length");
-            
-        // ...
+
+        // Same logic with extra rows as 1.3, we can reuse the function for each y
+        let N1 = Length(x);
+        let N2 = Length(y);
+        for (i in 0..N2-1) {
+            Oracle_OperatorOutput(x, y[i], A[i]);
+        }
     }
     
     
@@ -98,8 +116,11 @@ namespace Quantum.Kata.SimonsAlgorithm {
     // Goal: create an equal superposition of all basis vectors from |0...0⟩ to |1...1⟩ on query register
     // (i.e. the state (|0...0⟩ + ... + |1...1⟩) / sqrt(2^N)).
     operation SA_StatePrep (query : Qubit[]) : Unit
-    is Adj {        
-        // ...
+    is Adj {
+        let N = Length(query);
+        for (i in 0..N-1) {
+            H(query[i]);
+        }
     }
     
     
@@ -128,9 +149,23 @@ namespace Quantum.Kata.SimonsAlgorithm {
         // Declare an Int array in which the result will be stored;
         // the variable has to be mutable to allow updating it.
         mutable b = new Int[N];
-        
-        // ...
 
+        using(anc = Qubit[2*N]) {
+            SA_StatePrep(anc[0..N-1]);
+            Uf(anc[0..N-1], anc[N..2*N-1]);
+            // Measure the second half to collapse the first register
+            for (i in N..2*N-1) {
+                if (M(anc[i]) == One) {
+                }
+            }
+            SA_StatePrep(anc[0..N-1]);
+            for (i in 0..N-1) {
+                if (M(anc[i]) == One) {
+                    set b w/= i <- 1;
+                }
+            }
+            ResetAll(anc);
+        }
         return b;
     }
     

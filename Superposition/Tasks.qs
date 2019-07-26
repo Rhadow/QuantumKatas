@@ -296,8 +296,26 @@ namespace Quantum.Kata.Superposition {
     //          the state you need to prepare is (|010⟩ + |100⟩ + |001⟩ + |110⟩) / 2.
     operation FourBitstringSuperposition (qs : Qubit[], bits : Bool[][]) : Unit {
         // Hint: remember that you can allocate extra qubits.
-        // ...
-        // Need to understand how ancilla bits work in q sharp
+        let N = Length(qs);
+        using (anc = Qubit[2]) {
+            H(anc[0]);
+            H(anc[1]);
+            for (j in 0..N-1) {
+                for (i in 0..3) {
+                    if (bits[i][j]) {
+                        (ControlledOnInt(i, X))(anc, qs[j]);
+                    }
+                }
+            }
+            for (i in 0..3) {
+                if (i % 2 == 1) {
+                    (ControlledOnBitString(bits[i], X))(qs, anc[0]);
+                }
+                if (i / 2 >= 1) {
+                    (ControlledOnBitString(bits[i], X))(qs, anc[1]);
+                }
+            }
+        }
     }
     
     

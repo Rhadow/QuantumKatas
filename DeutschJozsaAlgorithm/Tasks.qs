@@ -58,7 +58,7 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // Since f(x) = 1 for all values of x, |y ⊕ f(x)⟩ = |y ⊕ 1⟩ = |NOT y⟩.
         // This means that the operation needs to flip qubit y (i.e. transform |0⟩ to |1⟩ and vice versa).
 
-        // ...
+        X(y);
     }
     
     
@@ -73,7 +73,7 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactB(0 <= k and k < Length(x), true, "k should be between 0 and N-1, inclusive");
 
-        // ...
+        CNOT(x[k], y);
     }
     
     
@@ -84,8 +84,10 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
     // Goal: transform state |x, y⟩ into state |x, y ⊕ f(x)⟩ (⊕ is addition modulo 2).
     operation Oracle_OddNumberOfOnes (x : Qubit[], y : Qubit) : Unit {
         // Hint: f(x) can be represented as x_0 ⊕ x_1 ⊕ ... ⊕ x_(N-1)
-
-        // ...
+        let N = Length(x);
+        for (i in 0..N-1) {
+            CNOT(x[i], y);
+        }
     }
     
     
@@ -103,7 +105,12 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(r), "Arrays should have the same length");
 
-        // ...
+        let N = Length(x);
+        for (i in 0..N-1) {
+            if (r[i] % 2 == 1) {
+                CNOT(x[i], y);
+            }
+        }
     }
     
     
@@ -119,7 +126,23 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // You don't need to modify it. Feel free to remove it, this won't cause your code to fail.
         EqualityFactI(Length(x), Length(r), "Arrays should have the same length");
 
-        // ...
+        // Replace xᵢ with 1 or zero and the result will be:
+        // xᵢ = 0 => 1 - rᵢ
+        // xᵢ = 1 => rᵢ
+        // In other word, when rᵢ is odd, it will only affect our output when xᵢ is 1 since 1 - rᵢ is gonna be even and even number does nothing to ⊕.
+        // On the other side, when rᵢ is even, since 1 - rᵢ is odd, it might affect output when xᵢ is 0.
+
+        let N = Length(x);
+        mutable num = 0;
+        for (i in 0..N-1) {
+            if (r[i] % 2 == 0) {
+                X(x[i]);
+                CNOT(x[i], y);
+                X(x[i]);
+            } else {
+                CNOT(x[i], y);
+            }
+        }
     }
     
     
@@ -139,13 +162,31 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         EqualityFactB(1 <= P and P <= Length(x), true, "P should be between 1 and N, inclusive");
 
         // Hint: the first part of the function is the same as in task 1.4
-
-        // ...
-
-        // Hint: you can use Controlled functor to perform multicontrolled gates
-        // (gates with multiple control qubits).
-
-        // ...
+        let N = Length(x);
+        let prefixLength = Length(prefix);
+        using (anc = Qubit[prefixLength]) {
+            for (i in 0..N-1) {
+                // This CNOT ensure the result is the same as 1.4
+                CNOT(x[i], y);
+                // Since we need to compare the bits without measuring them, applying CNOT using x and prefix as controlled bit is a perfect solution.
+                // if these two values are the same, the result ancilla bit should always be zero because we are applying NOT twice or not applying at all.
+                if (i < prefixLength) {
+                    CNOT(x[i], anc[i]);
+                    if (prefix[i] == 1) {
+                        X(anc[i]);
+                    }
+                }
+            }
+            // Here, we add one (apply X) only when ancilla bits are zero only. Any differences in prefix and x will result ancilla bits to be non-zero.
+            (ControlledOnInt(0, X))(anc, y);
+            // Clear ancilla bits, ResetAll does not work, still need to figure out why
+            for (i in 0..prefixLength-1) {
+                CNOT(x[i], anc[i]);
+                if (prefix[i] == 1) {
+                    X(anc[i]);
+                }
+            }
+        }
     }
     
     
@@ -161,7 +202,58 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
 
         // Hint: represent f(x) in terms of AND and ⊕ operations
 
-        // ...
+        // There are only 4 cases where f(x) is returning 1 which are 011, 101, 110, 111. We can separate them into two cases:
+        // 1. 111 - When 3 bits AND together, we want a one. We can achieve this using two CCNOT (Tofolli gate).
+        // 2. 011, 101, 110 - When 3 bits XOR together, it will return 0 if there are two ones in there. One thing to notice, we need to get
+        // rid of the 000 case since 000 XOR together is also returning zero. We can then invert the result and use it on y.
+
+
+        // Covers the first (AND together) case, notice that these two cases does not affect each other, we can do them sequentially without conditions.
+        using (anc = Qubit()) {
+            CCNOT(x[0], x[1], anc);
+            CCNOT(anc, x[2], y);
+            CCNOT(x[0], x[1], anc);
+        }
+
+        // Covers the second case
+        using (anc = Qubit[3]) {
+            // anc[1] and anc[2] are used to check the 000 case, I invert the x and AND them together. anc[2] will be one only when x is 000.
+            X(x[0]);
+            X(x[1]);
+            X(x[2]);
+            CCNOT(x[0], x[1], anc[1]);
+            CCNOT(anc[1], x[2], anc[2]);
+            // Since I want to CNOT y when anc[2] is zero (not 000), I invert it again for later use
+            X(anc[2]);
+            // Revert the change on x since we shouldn't change them
+            X(x[0]);
+            X(x[1]);
+            X(x[2]);
+
+            // XOR three bits together
+            CNOT(x[0], anc[0]);
+            CNOT(x[1], anc[0]);
+            CNOT(x[2], anc[0]);
+            // Invert it, since we want to use it as a conditional bit later
+            X(anc[0]);
+            // We only invert y when anc[0] (3 bit of x XOR together is 0) and anc[2] (x is not equal to 000) are both true
+            CCNOT(anc[0], anc[2], y);
+
+            // Clear ancillabit
+            X(anc[0]);
+            CNOT(x[2], anc[0]);
+            CNOT(x[1], anc[0]);
+            CNOT(x[0], anc[0]);
+            X(x[0]);
+            X(x[1]);
+            X(x[2]);
+            X(anc[2]);
+            CCNOT(anc[1], x[2], anc[2]);
+            CCNOT(x[0], x[1], anc[1]);
+            X(x[2]);
+            X(x[1]);
+            X(x[0]);
+        }
     }
     
     
@@ -179,7 +271,12 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
     //      2) create |-⟩ state (|-⟩ = (|0⟩ - |1⟩) / sqrt(2)) on answer register
     operation BV_StatePrep (query : Qubit[], answer : Qubit) : Unit
     is Adj {
-            // ...
+        let N = Length(query);
+        for (i in 0..N-1) {
+            H(query[i]);
+        }
+        X(answer);
+        H(answer);
     }
     
     
@@ -203,7 +300,18 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // the variable has to be mutable to allow updating it.
         mutable r = new Int[N];
         
-        // ...
+        using (query = Qubit[N]) {
+            using (answer = Qubit()) {
+                BV_StatePrep(query, answer);
+                Uf(query, answer);
+                BV_StatePrep(query, answer);
+                for (i in 0..N-1) {
+                    set r w/= i <- M(query[i]) == One ? 1 | 0;
+                }
+                Reset(answer);
+            }
+            ResetAll(query);
+        }
 
         return r;
     }
@@ -262,7 +370,13 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
         // it can be expressed as running Bernstein-Vazirani algorithm
         // and then post-processing the return value classically.
         
-        // ...
+        let amps = BV_Algorithm(N, Uf);
+
+        for (i in 0..Length(amps)-1) {
+            if (amps[i] == 1) {
+                set isConstantFunction = false;
+            }
+        }
 
         return isConstantFunction;
     }
@@ -298,16 +412,26 @@ namespace Quantum.Kata.DeutschJozsaAlgorithm {
     // Output:
     //      A bit vector r which generates the same oracle as the one you are given
     operation Noname_Algorithm (N : Int, Uf : ((Qubit[], Qubit) => Unit)) : Int[] {
-        
+
         // Hint: The bit vector r does not need to be the same as the one used by the oracle,
         // it just needs to produce equivalent results.
-        
+
         // Declare an Int array in which the result will be stored;
         // the variable has to be mutable to allow updating it.
-        mutable r = new Int[N];
-        
-        // ...
-        return r;
+
+        using ((x, y) = (Qubit[N], Qubit())) {
+            Uf(x, y);
+            if (N % 2 == 1) {
+                X(y);
+            }
+            mutable r = new Int[N];
+            if (M(y) == One) {
+                set r w/= 0 <- 1;
+            }
+            ResetAll(x);
+            Reset(y);
+            return r;
+        }
     }
-    
+
 }
